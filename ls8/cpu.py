@@ -20,24 +20,34 @@ class CPU:
     def load(self):
         """Load a program into memory."""
 
+        # address = 0
+        #
+        # # For now, we've just hardcoded a program:
+        #
+        # program = [
+        #     # From print8.ls8
+        #     0b10000010, # LDI R0,8
+        #     0b00000000,
+        #     0b00001000,
+        #     0b01000111, # PRN R0
+        #     0b00000000,
+        #     0b00000001, # HLT
+        # ]
+        #
+        # for instruction in program:
+        #     self.ram[address] = instruction
+        #     address += 1
+
         address = 0
 
-        # For now, we've just hardcoded a program:
-
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
-
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
-
+        with open(sys.argv[1]) as f:
+            for line in f:
+                line_value = line.split("#")[0].strip()
+                if line_value == '':
+                    continue
+                val = int(line_value, 2)
+                self.ram[address] = val
+                address += 1
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
@@ -45,6 +55,8 @@ class CPU:
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         #elif op == "SUB": etc
+        elif op == "MUL":
+            self.reg[reg_a] *= self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -74,6 +86,7 @@ class CPU:
         LDI = 0b10000010
         PRN = 0b01000111
         HLT = 0b00000001
+        MUL = 0b10100010
 
         running = True
 
@@ -87,12 +100,16 @@ class CPU:
 
             if ir == LDI:
                 self.reg[operand_a] = operand_b
-                self.pc += 3
+                # self.pc += 3
 
             elif ir == PRN:
                 print_item = self.ram[self.pc + 1]
                 print(self.reg[print_item])
-                self.pc += 2
+                # self.pc += 2
+
+            elif ir == MUL:
+                self.alu("MUL", operand_a, operand_b)
+                # self.pc += 3
 
             elif ir == HLT:
                 running = False
@@ -100,3 +117,5 @@ class CPU:
             else:
                 print('Not working')
                 running = False
+
+            self.pc += (ir >> 6) + 1
