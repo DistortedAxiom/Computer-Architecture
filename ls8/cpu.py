@@ -2,6 +2,8 @@
 
 import sys
 
+SP = 7
+
 class CPU:
     """Main CPU class."""
 
@@ -10,6 +12,7 @@ class CPU:
         self.ram = [0] * 256
         self.reg = [0] * 8   # RO-R7
         self.pc = 0
+        self.reg[SP] = 0xF4
 
     def ram_read(self, MAR):
         return self.ram[MAR]
@@ -38,16 +41,25 @@ class CPU:
         #     self.ram[address] = instruction
         #     address += 1
 
+        if len(sys.argv) != 2:
+            print("usage: python3 ls8.py examples/mult.ls8")
+            sys.exit(1)
+
         address = 0
 
-        with open(sys.argv[1]) as f:
-            for line in f:
-                line_value = line.split("#")[0].strip()
-                if line_value == '':
-                    continue
-                val = int(line_value, 2)
-                self.ram[address] = val
-                address += 1
+        try:
+            with open(sys.argv[1]) as f:
+                for line in f:
+                    line_value = line.split("#")[0].strip()
+                    if line_value == '':
+                        continue
+                    val = int(line_value, 2)
+                    self.ram[address] = val
+                    address += 1
+
+        except FileNotFoundError:
+            print(f"File not found: {sys.argv[1]}")
+            sys.exit(2)
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
@@ -87,12 +99,12 @@ class CPU:
         PRN = 0b01000111
         HLT = 0b00000001
         MUL = 0b10100010
+        PUSH = 0b01000101
+        POP = 0b01000110
 
         running = True
 
         while running:
-
-            self.trace()
 
             ir = self.ram_read(self.pc)
             operand_a = self.ram_read(self.pc + 1)
@@ -111,6 +123,38 @@ class CPU:
                 self.alu("MUL", operand_a, operand_b)
                 # self.pc += 3
 
+            elif ir == PUSH:
+                # Decrement SP
+                self.reg[SP] -= 1
+
+                # Get reg_num to push
+                # reg_num = self.ram_read(self.pc + 1)
+                # Same as operand_a
+
+                # Get the value to push
+                value = self.reg[operand_a]
+
+                # Copy the value to the SP address
+                top_of_stack_address = self.reg[SP]
+                self.ram[top_of_stack_address] = value
+
+            elif ir == POP:
+                # Get reg to pop into
+                # reg_num = self.ram_read(self.pc + 1)
+                # Same as operand_a
+
+                # Get the top stack of address
+                top_of_stack_address = self.reg[SP]
+
+                # Get the value of the top of the stack
+                value = self.ram[top_of_stack_address]
+
+                # Store the value in register
+                self.reg[operand_a] = value
+
+                #Increment the SP
+                self.reg[SP] += 1
+
             elif ir == HLT:
                 running = False
 
@@ -118,4 +162,5 @@ class CPU:
                 print('Not working')
                 running = False
 
-            self.pc += (ir >> 6) + 1
+            number_of_operands = (ir >> 6)
+            self.pc += number_of_operands + 1
