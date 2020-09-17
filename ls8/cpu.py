@@ -13,6 +13,17 @@ class CPU:
         self.reg = [0] * 8   # RO-R7
         self.pc = 0
         self.reg[SP] = 0xF4
+        self.branch_table = {
+            0b10000010: self.LDI,
+            0b01000111: self.PRN,
+            0b10100000: self.ADD,
+            0b10100010: self.MUL,
+            0b01000101: self.PUSH,
+            0b01000110: self.POP,
+            0b01010000: self.CALL,
+            0b00010001: self.RET,
+        }
+        self.running = True
 
     def ram_read(self, MAR):
         return self.ram[MAR]
@@ -92,75 +103,90 @@ class CPU:
 
         print()
 
+    def HLT(self, operand_a, operand_b):
+        self.running = False
+
+    def LDI(self, operand_a, operand_b):
+        self.reg[operand_a] = operand_b
+
+    def PRN(self, operand_a, operand_b):
+        print(self.reg[operand_a])
+
+    def ADD(self, operand_a, operand_b):
+        self.reg[operand_a] += self.reg[operand_b]
+
+    def MUL(self, operand_a, operand_b):
+        self.reg[operand_a] *= self.reg[operand_b]
+
+    def PUSH(self, operand_a, operand_b):
+        # Decrement SP
+        self.reg[SP] -= 1
+
+        # Get reg_num to push
+        # reg_num = self.ram_read(self.pc + 1)
+        # Same as operand_a
+
+        # Get the value to push
+        value = self.reg[operand_a]
+
+        # Copy the value to the SP address
+        top_of_stack_address = self.reg[SP]
+        self.ram[top_of_stack_address] = value
+
+    def POP(self, operand_a, operand_b):
+        # Get reg to pop into
+        # reg_num = self.ram_read(self.pc + 1)
+        # Same as operand_a
+
+        # Get the top stack of address
+        top_of_stack_address = self.reg[SP]
+
+        # Get the value of the top of the stack
+        value = self.ram[top_of_stack_address]
+
+        # Store the value in register
+        self.reg[operand_a] = value
+
+        # Increment the SP
+        self.reg[SP] += 1
+
+    def CALL(self, operand_a, operand_b):
+
+        self.reg[SP] -= 1
+
+        top_of_stack_address = self.reg[SP]
+
+        self.ram[top_of_stack_address] = self.pc + 2
+
+        self.pc = self.reg[operand_a]
+
+
+    def RET(self, operand_a, operand_b):
+
+        top_of_stack_address = self.reg[SP]
+
+        value = self.ram[top_of_stack_address]
+
+        self.pc = value
+
+        self.reg[SP] += 1
+
     def run(self):
         """Run the CPU."""
 
-        LDI = 0b10000010
-        PRN = 0b01000111
-        HLT = 0b00000001
-        MUL = 0b10100010
-        PUSH = 0b01000101
-        POP = 0b01000110
-
-        running = True
-
-        while running:
+        while self.running:
 
             ir = self.ram_read(self.pc)
             operand_a = self.ram_read(self.pc + 1)
             operand_b = self.ram_read(self.pc + 2)
 
-            if ir == LDI:
-                self.reg[operand_a] = operand_b
-                # self.pc += 3
-
-            elif ir == PRN:
-                print_item = self.ram[self.pc + 1]
-                print(self.reg[print_item])
-                # self.pc += 2
-
-            elif ir == MUL:
-                self.alu("MUL", operand_a, operand_b)
-                # self.pc += 3
-
-            elif ir == PUSH:
-                # Decrement SP
-                self.reg[SP] -= 1
-
-                # Get reg_num to push
-                # reg_num = self.ram_read(self.pc + 1)
-                # Same as operand_a
-
-                # Get the value to push
-                value = self.reg[operand_a]
-
-                # Copy the value to the SP address
-                top_of_stack_address = self.reg[SP]
-                self.ram[top_of_stack_address] = value
-
-            elif ir == POP:
-                # Get reg to pop into
-                # reg_num = self.ram_read(self.pc + 1)
-                # Same as operand_a
-
-                # Get the top stack of address
-                top_of_stack_address = self.reg[SP]
-
-                # Get the value of the top of the stack
-                value = self.ram[top_of_stack_address]
-
-                # Store the value in register
-                self.reg[operand_a] = value
-
-                #Increment the SP
-                self.reg[SP] += 1
-
-            elif ir == HLT:
-                running = False
+            if ir in self.branch_table:
+                self.branch_table[ir](operand_a, operand_b)
+                ops = ir >> 6
+                # check if this code will auto set the pc or not
+                set_directly = (ir & 0b10000) >> 4  # mask
+                if not set_directly:
+                    self.pc += ops + 1
 
             else:
-                print('Not working')
-                running = False
-
-            number_of_operands = (ir >> 6)
-            self.pc += number_of_operands + 1
+                sys.exit(1)
